@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "850197613162",
+    "project_id": "demoappcmru",
+    "storage_bucket": "demoappcmru.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:850197613162:android:43ae5ba67fd20627a59813",
+        "android_client_info": {
+          "package_name": "com.example.binsort_new"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnvfOiRtDt5lAMvubnfZij88jH9lETMt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:850197613162:android:334479131aabbebca59813",
+        "android_client_info": {
+          "package_name": "com.example.demo_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnvfOiRtDt5lAMvubnfZij88jH9lETMt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
