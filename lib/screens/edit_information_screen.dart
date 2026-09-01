@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,7 +7,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:http/http.dart' as http; // แก้เส้นแดง: ต้องมีตัวนี้เพื่อส่งรูป
 import 'dart:convert'; // แก้เส้นแดง: ต้องมีตัวนี้เพื่ออ่านค่า URL ที่ตอบกลับมา
 import 'package:image_picker/image_picker.dart'; // แก้เส้นแดง: ต้องมีตัวนี้เพื่อเลือกรูป
-import 'dart:io';
+import 'package:image/image.dart' as img; // ✅ ใช้ครอปรูปเป็นสี่เหลี่ยมจัตุรัสอัตโนมัติ (ทำงานได้ทั้งเว็บ/มือถือ)
+import 'app_theme.dart';
 
 class EditInformationScreen extends StatefulWidget {
   const EditInformationScreen({super.key});
@@ -19,9 +22,10 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
 
-  File? _imageFile; // ตัวแปรเก็บไฟล์รูปที่เลือก
+  Uint8List? _imageBytes; // ✅ เปลี่ยนจาก File → bytes เพื่อให้ทำงานถูกต้องบน Flutter Web ด้วย
   String? _currentImageUrl; // ตัวแปรเก็บ URL รูปปัจจุบันจากฐานข้อมูล
   bool _isLoading = false;
+  bool _isCropping = false;
 
   @override
   void initState() {
@@ -45,16 +49,42 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
     }
   }
 
-  // ฟังก์ชันเลือกรูปจากเครื่อง
+  //  เลือกรูปจากเครื่อง แล้วครอปเป็นสี่เหลี่ยมจัตุรัสจากกึ่งกลางอัตโนมัติ
   Future<void> _pickImage() async {
     final pickedFile = await ImagePicker().pickImage(
       source: ImageSource.gallery,
+      imageQuality: 90,
     );
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+    if (pickedFile == null) return;
+
+    setState(() => _isCropping = true);
+    try {
+      final rawBytes = await pickedFile.readAsBytes();
+      final cropped = await compute(_cropSquareIsolate, rawBytes);
+      if (mounted) {
+        setState(() {
+          _imageBytes = cropped;
+          _isCropping = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Crop error: $e');
+      if (mounted) setState(() => _isCropping = false);
     }
+  }
+
+  //  ครอปรูปเป็นสี่เหลี่ยมจัตุรัสจากกึ่งกลาง + ย่อขนาดให้พอดีกับ avatar
+  static Uint8List _cropSquareIsolate(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return bytes;
+
+    final side = decoded.width < decoded.height ? decoded.width : decoded.height;
+    final offsetX = (decoded.width - side) ~/ 2;
+    final offsetY = (decoded.height - side) ~/ 2;
+
+    final cropped = img.copyCrop(decoded, x: offsetX, y: offsetY, width: side, height: side);
+    final resized = img.copyResize(cropped, width: 500, height: 500);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 88));
   }
 
   // ฟังก์ชันอัปโหลดไป Cloudinary และบันทึกลง Firestore
@@ -63,7 +93,7 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
     try {
       String? finalImageUrl = _currentImageUrl;
 
-      if (_imageFile != null) {
+      if (_imageBytes != null) {
         // --- ส่วนส่งรูปไป Cloudinary ---
         var request = http.MultipartRequest(
           'POST',
@@ -73,7 +103,7 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
         // **สำคัญ: เปลี่ยน 'YOUR_PRESET' เป็นชื่อที่คุณตั้งใน Cloudinary (แบบ Unsigned)**
         request.fields['upload_preset'] = 'my_preset';
         request.files.add(
-          await http.MultipartFile.fromPath('file', _imageFile!.path),
+          http.MultipartFile.fromBytes('file', _imageBytes!, filename: 'profile.jpg'),
         );
 
         var response = await request.send();
@@ -96,9 +126,9 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
           });
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('update_successful'.tr())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('update_successful'.tr()), backgroundColor: kPrimaryGreen),
+        );
         Navigator.pop(context); // กลับไปหน้า Profile
       }
     } catch (e) {
@@ -114,76 +144,87 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF9E3), // สีพื้นหลังตามดีไซน์
+      backgroundColor: kScreenBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFE4E1),
+        backgroundColor: kPrimaryGreen,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'edit_information'.tr(),
           style: const TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: kPrimaryGreen))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 10),
                   Text(
                     'edit_profile'.tr(),
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: kDarkGreen,
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // ส่วนคลิกเพื่อเปลี่ยนรูป
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundColor: Colors.white,
-                          backgroundImage: _imageFile != null
-                              ? FileImage(_imageFile!)
-                              : (_currentImageUrl != null
+                  // ส่วนคลิกเพื่อเปลี่ยนรูป (ครอปสี่เหลี่ยมจัตุรัสอัตโนมัติ)
+                  Center(
+                    child: GestureDetector(
+                      onTap: _isCropping ? null : _pickImage,
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.white,
+                            backgroundImage: _imageBytes != null
+                                ? MemoryImage(_imageBytes!)
+                                : (_currentImageUrl != null
                                         ? NetworkImage(_currentImageUrl!)
-                                        : null)
-                                    as ImageProvider?,
-                          child:
-                              (_imageFile == null && _currentImageUrl == null)
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Colors.grey,
-                                )
-                              : null,
-                        ),
-                        const Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: CircleAvatar(
-                            backgroundColor: Color(0xFFD4B996),
-                            radius: 18,
-                            child: Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 18,
+                                        : null) as ImageProvider?,
+                            child: _isCropping
+                                ? const CircularProgressIndicator(color: kPrimaryGreen)
+                                : (_imageBytes == null && _currentImageUrl == null)
+                                    ? const Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: Colors.grey,
+                                      )
+                                    : null,
+                          ),
+                          const Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: CircleAvatar(
+                              backgroundColor: kPrimaryGreen,
+                              radius: 18,
+                              child: Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'edit_photo_crop_hint'.tr(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   ),
 
                   const SizedBox(height: 30),
@@ -209,19 +250,21 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
                   const SizedBox(height: 40),
 
                   // ปุ่มอัปเดต
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFA5D6A7),
-                      minimumSize: const Size(200, 50),
-                      shape: const StadiumBorder(),
-                    ),
-                    onPressed: _handleUpdate,
-                    child: Text(
-                      'update'.tr(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                  Center(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryGreen,
+                        minimumSize: const Size(200, 50),
+                        shape: const StadiumBorder(),
+                      ),
+                      onPressed: _handleUpdate,
+                      child: Text(
+                        'update'.tr(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -237,20 +280,31 @@ class _EditInformationScreenState extends State<EditInformationScreen> {
     IconData icon, {
     bool enabled = true,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
-        color: enabled ? Colors.white : Colors.grey[200],
-        borderRadius: BorderRadius.circular(15),
-      ),
+    final borderStyle = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
       child: TextField(
         controller: controller,
         enabled: enabled,
+        cursorColor: kPrimaryGreen,
+        style: TextStyle(color: enabled ? Colors.black87 : Colors.grey.shade600),
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon),
-          border: InputBorder.none,
+          labelStyle: TextStyle(color: enabled ? kDarkGreen : Colors.grey),
+          prefixIcon: Icon(icon, color: enabled ? kPrimaryGreen : Colors.grey),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 15),
+          border: borderStyle,
+          enabledBorder: borderStyle,
+          disabledBorder: borderStyle,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: kPrimaryGreen, width: 1.5),
+          ),
         ),
       ),
     );

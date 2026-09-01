@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'home_screen.dart';
-import 'activity_screen.dart';
-import 'my_qr_code_screen.dart';
-import 'ranking_screen.dart';
-import 'profile_screen.dart';
 
 class WasteGuideScreen extends StatefulWidget {
   const WasteGuideScreen({super.key});
@@ -14,230 +9,98 @@ class WasteGuideScreen extends StatefulWidget {
 }
 
 class _WasteGuideScreenState extends State<WasteGuideScreen> {
-  int _selectedBin = 0; // 0=ทั้งหมด 1=น้ำเงิน 2=เขียว 3=เหลือง 4=แดง
+  int _selectedBin = 0;
   int _expandedIndex = -1;
 
-  final List<Map<String, dynamic>> _bins = [
-    {
-      'label': 'ทั้งหมด',
-      'color': Colors.grey,
-      'icon': Icons.delete_outline,
-    },
-    {
-      'label': 'น้ำเงิน',
-      'color': const Color(0xFF1565C0),
-      'icon': Icons.recycling,
-      'desc': 'ขยะรีไซเคิล — วัสดุที่สามารถนำกลับมาใช้ใหม่ได้',
-    },
-    {
-      'label': 'เขียว',
-      'color': const Color(0xFF2E7D32),
-      'icon': Icons.eco,
-      'desc': 'ขยะอินทรีย์ — เศษอาหารและวัสดุที่ย่อยสลายได้',
-    },
-    {
-      'label': 'เหลือง',
-      'color': const Color(0xFFF9A825),
-      'icon': Icons.delete_outline,
-      'desc': 'ขยะทั่วไป — ขยะที่ไม่สามารถรีไซเคิลหรือย่อยสลายได้',
-    },
-    {
-      'label': 'แดง',
-      'color': const Color(0xFFB71C1C),
-      'icon': Icons.warning_amber_rounded,
-      'desc': 'ขยะอันตราย — วัสดุที่มีสารพิษหรืออันตราย',
-    },
+  List<Map<String, dynamic>> get _bins => [
+    {'label': 'wg_bin_all'.tr(), 'color': Colors.grey, 'icon': Icons.delete_outline},
+    {'label': 'wg_bin_recycle'.tr(), 'color': const Color(0xFFF9A825), 'icon': Icons.recycling, 'desc': 'wg_bin_recycle_desc'.tr()},
+    {'label': 'wg_bin_organic'.tr(), 'color': const Color(0xFF2E7D32), 'icon': Icons.eco, 'desc': 'wg_bin_organic_desc'.tr()},
+    {'label': 'wg_bin_general'.tr(), 'color': const Color(0xFF1565C0), 'icon': Icons.delete_outline, 'desc': 'wg_bin_general_desc'.tr()},
+    {'label': 'wg_bin_hazard'.tr(), 'color': const Color(0xFFB71C1C), 'icon': Icons.warning_amber_rounded, 'desc': 'wg_bin_hazard_desc'.tr()},
   ];
 
+  // ✅ ใช้ key แทน hardcode - .tr() ตอน build
   final List<Map<String, dynamic>> _wasteItems = [
-    // ── รีไซเคิล (น้ำเงิน) ──────────────────────────────────────────────────
     {
-      'bin': 1,
-      'name': 'พลาสติก',
-      'sub': 'PET, PP, HDPE, LDPE',
-      'icon': Icons.local_drink_outlined,
-      'bgColor': const Color(0xFFE3F2FD),
-      'examples': ['ขวดน้ำ PET', 'ถุงพลาสติก PP', 'กล่องอาหาร HDPE', 'หลอดดูด'],
-      'doList': [
-        'ล้างให้สะอาดก่อนทิ้ง',
-        'แยกฝาออกจากขวด',
-        'บีบให้แบนเพื่อประหยัดพื้นที่',
-        'ดูสัญลักษณ์รีไซเคิลที่ก้นภาชนะ',
-      ],
-      'dontList': [
-        'ไม่ทิ้งพลาสติกปนกับขยะเปียก',
-        'ไม่รีไซเคิลโฟม EPS',
-        'ไม่ทิ้งถุงพลาสติกในถังรีไซเคิล',
-      ],
-      'note': 'พลาสติก 1 ตัน รีไซเคิลได้ประหยัดน้ำมัน 5,774 ลิตร',
+      'bin': 1, 'nameKey': 'wg_plastic', 'subKey': 'wg_plastic_sub',
+      'icon': Icons.local_drink_outlined, 'bgColor': const Color(0xFFFFFDE7),
+      'examples': ['wg_plastic_ex1', 'wg_plastic_ex2', 'wg_plastic_ex3', 'wg_plastic_ex4'],
+      'doList': ['wg_plastic_do1', 'wg_plastic_do2', 'wg_plastic_do3', 'wg_plastic_do4'],
+      'dontList': ['wg_plastic_dont1', 'wg_plastic_dont2', 'wg_plastic_dont3'],
+      'note': 'wg_plastic_note',
     },
     {
-      'bin': 1,
-      'name': 'กระดาษ',
-      'sub': 'กระดาษทุกชนิดที่แห้งสะอาด',
-      'icon': Icons.auto_stories_outlined,
-      'bgColor': const Color(0xFFE3F2FD),
-      'examples': ['หนังสือพิมพ์', 'กล่องกระดาษ', 'นิตยสาร', 'กระดาษ A4'],
-      'doList': [
-        'พับหรือม้วนให้เรียบร้อย',
-        'แยกสันเล่มออกก่อนรีไซเคิล',
-        'มัดรวมกันเป็นกอง',
-      ],
-      'dontList': [
-        'ไม่ทิ้งกระดาษเปียกหรือมันวาว',
-        'ไม่รีไซเคิลกระดาษทิชชู่ที่ใช้แล้ว',
-        'ไม่ทิ้งกล่องอาหารที่มีคราบมัน',
-      ],
-      'note': 'รีไซเคิลกระดาษ 1 ตัน = ช่วยต้นไม้ 17 ต้น',
+      'bin': 1, 'nameKey': 'wg_paper', 'subKey': 'wg_paper_sub',
+      'icon': Icons.auto_stories_outlined, 'bgColor': const Color(0xFFFFFDE7),
+      'examples': ['wg_paper_ex1', 'wg_paper_ex2', 'wg_paper_ex3', 'wg_paper_ex4'],
+      'doList': ['wg_paper_do1', 'wg_paper_do2', 'wg_paper_do3'],
+      'dontList': ['wg_paper_dont1', 'wg_paper_dont2', 'wg_paper_dont3'],
+      'note': 'wg_paper_note',
     },
     {
-      'bin': 1,
-      'name': 'โลหะ',
-      'sub': 'เหล็ก อะลูมิเนียม ทองแดง',
-      'icon': Icons.inventory_2_outlined,
-      'bgColor': const Color(0xFFE3F2FD),
-      'examples': ['กระป๋องน้ำอัดลม', 'กระป๋องอาหาร', 'ฝาขวด', 'ลวด'],
-      'doList': [
-        'ล้างให้สะอาดก่อนทิ้ง',
-        'บีบให้แบนเพื่อประหยัดพื้นที่',
-        'แยกโลหะจากวัสดุอื่น',
-      ],
-      'dontList': [
-        'ไม่ทิ้งกระป๋องที่มีของเหลวเหลืออยู่',
-        'ไม่รวมกับแก้วหรือพลาสติก',
-      ],
-      'note': 'รีไซเคิลอะลูมิเนียม 1 กระป๋อง ประหยัดพลังงานได้ 95%',
+      'bin': 1, 'nameKey': 'wg_metal', 'subKey': 'wg_metal_sub',
+      'icon': Icons.inventory_2_outlined, 'bgColor': const Color(0xFFFFFDE7),
+      'examples': ['wg_metal_ex1', 'wg_metal_ex2', 'wg_metal_ex3', 'wg_metal_ex4'],
+      'doList': ['wg_metal_do1', 'wg_metal_do2', 'wg_metal_do3'],
+      'dontList': ['wg_metal_dont1', 'wg_metal_dont2'],
+      'note': 'wg_metal_note',
     },
     {
-      'bin': 1,
-      'name': 'แก้ว',
-      'sub': 'ขวดแก้ว กระจก',
-      'icon': Icons.wine_bar_outlined,
-      'bgColor': const Color(0xFFE3F2FD),
-      'examples': ['ขวดน้ำแก้ว', 'ขวดซอส', 'แจกัน', 'กระจกหน้าต่าง'],
-      'doList': [
-        'ล้างให้สะอาดก่อนทิ้ง',
-        'แยกฝาโลหะออก',
-        'ระวังขอบแหลมคม',
-      ],
-      'dontList': [
-        'ไม่ทิ้งหลอดไฟหรือกระจกรถในถังนี้',
-        'ไม่ทุบแก้วให้แตกก่อนทิ้ง',
-      ],
-      'note': 'แก้วรีไซเคิลได้ 100% โดยไม่สูญเสียคุณภาพ',
-    },
-
-    // ── อินทรีย์ (เขียว) ─────────────────────────────────────────────────────
-    {
-      'bin': 2,
-      'name': 'เศษอาหาร',
-      'sub': 'อาหารเหลือ เปลือกผลไม้',
-      'icon': Icons.restaurant_outlined,
-      'bgColor': const Color(0xFFE8F5E9),
-      'examples': ['เศษข้าว', 'เปลือกผลไม้', 'กากกาแฟ', 'เปลือกไข่'],
-      'doList': [
-        'สะเด็ดน้ำให้แห้งก่อนทิ้ง',
-        'ใช้ถุงย่อยสลายได้',
-        'แยกจากขยะประเภทอื่น',
-      ],
-      'dontList': [
-        'ไม่ทิ้งกระดูกสัตว์ขนาดใหญ่',
-        'ไม่ทิ้งน้ำมันปรุงอาหาร',
-      ],
-      'note': 'เศษอาหารทำปุ๋ยหมักได้ภายใน 1-3 เดือน',
+      'bin': 1, 'nameKey': 'wg_glass', 'subKey': 'wg_glass_sub',
+      'icon': Icons.wine_bar_outlined, 'bgColor': const Color(0xFFFFFDE7),
+      'examples': ['wg_glass_ex1', 'wg_glass_ex2', 'wg_glass_ex3', 'wg_glass_ex4'],
+      'doList': ['wg_glass_do1', 'wg_glass_do2', 'wg_glass_do3'],
+      'dontList': ['wg_glass_dont1', 'wg_glass_dont2'],
+      'note': 'wg_glass_note',
     },
     {
-      'bin': 2,
-      'name': 'เศษพืช',
-      'sub': 'ใบไม้ กิ่งไม้ หญ้า',
-      'icon': Icons.eco_outlined,
-      'bgColor': const Color(0xFFE8F5E9),
-      'examples': ['ใบไม้แห้ง', 'กิ่งไม้เล็ก', 'หญ้าตัด', 'ดอกไม้เหี่ยว'],
-      'doList': [
-        'ตัดให้เป็นชิ้นเล็กก่อนทิ้ง',
-        'ผสมกับเศษอาหารได้',
-      ],
-      'dontList': [
-        'ไม่ทิ้งกิ่งไม้ขนาดใหญ่',
-        'ไม่ทิ้งพืชที่มียาฆ่าแมลง',
-      ],
-      'note': 'ใบไม้แห้งช่วยเพิ่มอากาศในกองปุ๋ยหมัก',
-    },
-
-    // ── ทั่วไป (เหลือง) ──────────────────────────────────────────────────────
-    {
-      'bin': 3,
-      'name': 'ขยะทั่วไป',
-      'sub': 'ขยะที่ไม่สามารถรีไซเคิลได้',
-      'icon': Icons.delete_outline,
-      'bgColor': const Color(0xFFFFFDE7),
-      'examples': ['โฟม EPS', 'ถุงขนม', 'ผ้าอ้อม', 'บุหรี่'],
-      'doList': [
-        'ใส่ถุงให้มิดชิดก่อนทิ้ง',
-        'ไม่ทิ้งของมีคม',
-      ],
-      'dontList': [
-        'ไม่ทิ้งขยะอันตรายในถังนี้',
-        'ไม่ทิ้งขวดแก้วแตก',
-      ],
-      'note': 'ลดขยะทั่วไปด้วยการเลือกซื้อสินค้าที่บรรจุภัณฑ์รีไซเคิลได้',
-    },
-
-    // ── อันตราย (แดง) ────────────────────────────────────────────────────────
-    {
-      'bin': 4,
-      'name': 'แบตเตอรี่',
-      'sub': 'แบตเตอรี่ทุกชนิด',
-      'icon': Icons.battery_alert_outlined,
-      'bgColor': const Color(0xFFFFEBEE),
-      'examples': ['แบตมือถือ', 'ถ่านไฟฉาย', 'แบตรถ', 'แบต laptop'],
-      'doList': [
-        'นำส่งจุดรับแบตเตอรี่เก่า',
-        'เก็บในที่แห้งก่อนนำส่ง',
-        'ห่อด้วยเทปที่ขั้วไฟฟ้า',
-      ],
-      'dontList': [
-        'ไม่ทิ้งในถังขยะทั่วไป',
-        'ไม่เผาหรือแช่น้ำ',
-        'ไม่แกะหรือเจาะแบตเตอรี่',
-      ],
-      'note': 'แบตเตอรี่ 1 ก้อนปนเปื้อนน้ำได้ถึง 400 ลิตร',
+      'bin': 2, 'nameKey': 'wg_food', 'subKey': 'wg_food_sub',
+      'icon': Icons.restaurant_outlined, 'bgColor': const Color(0xFFE8F5E9),
+      'examples': ['wg_food_ex1', 'wg_food_ex2', 'wg_food_ex3', 'wg_food_ex4'],
+      'doList': ['wg_food_do1', 'wg_food_do2', 'wg_food_do3'],
+      'dontList': ['wg_food_dont1', 'wg_food_dont2'],
+      'note': 'wg_food_note',
     },
     {
-      'bin': 4,
-      'name': 'หลอดไฟ',
-      'sub': 'หลอด LED, หลอดฟลูออเรสเซนต์',
-      'icon': Icons.lightbulb_outline,
-      'bgColor': const Color(0xFFFFEBEE),
-      'examples': ['หลอด LED', 'หลอดนีออน', 'หลอดประหยัดไฟ', 'หลอดฮาโลเจน'],
-      'doList': [
-        'ห่อด้วยกระดาษหนังสือพิมพ์',
-        'นำส่งศูนย์รับหลอดไฟเก่า',
-      ],
-      'dontList': [
-        'ไม่ทุบหรือทำให้แตก',
-        'ไม่ทิ้งในถังขยะทั่วไป',
-      ],
-      'note': 'หลอดฟลูออเรสเซนต์มีสารปรอท ต้องทิ้งอย่างถูกวิธี',
+      'bin': 2, 'nameKey': 'wg_plant', 'subKey': 'wg_plant_sub',
+      'icon': Icons.eco_outlined, 'bgColor': const Color(0xFFE8F5E9),
+      'examples': ['wg_plant_ex1', 'wg_plant_ex2', 'wg_plant_ex3', 'wg_plant_ex4'],
+      'doList': ['wg_plant_do1', 'wg_plant_do2'],
+      'dontList': ['wg_plant_dont1', 'wg_plant_dont2'],
+      'note': 'wg_plant_note',
     },
     {
-      'bin': 4,
-      'name': 'สารเคมี',
-      'sub': 'สี ยาฆ่าแมลง ตัวทำละลาย',
-      'icon': Icons.warning_amber_outlined,
-      'bgColor': const Color(0xFFFFEBEE),
-      'examples': ['สีทาบ้าน', 'ยาฆ่าแมลง', 'ทินเนอร์', 'น้ำยาล้างห้องน้ำ'],
-      'doList': [
-        'เก็บในภาชนะปิดสนิท',
-        'นำส่งศูนย์รับขยะอันตราย',
-        'อ่านฉลากวิธีทิ้งที่ถูกต้อง',
-      ],
-      'dontList': [
-        'ไม่เทลงท่อน้ำทิ้ง',
-        'ไม่เผาในที่โล่ง',
-        'ไม่ผสมสารเคมีต่างชนิด',
-      ],
-      'note': '1-5 ชาวบ้าน, 5 PET โรงงาน ประกัน PP-3 ปี',
+      'bin': 3, 'nameKey': 'wg_general', 'subKey': 'wg_general_sub',
+      'icon': Icons.delete_outline, 'bgColor': const Color(0xFFE3F2FD),
+      'examples': ['wg_general_ex1', 'wg_general_ex2', 'wg_general_ex3', 'wg_general_ex4'],
+      'doList': ['wg_general_do1', 'wg_general_do2'],
+      'dontList': ['wg_general_dont1', 'wg_general_dont2'],
+      'note': 'wg_general_note',
+    },
+    {
+      'bin': 4, 'nameKey': 'wg_battery', 'subKey': 'wg_battery_sub',
+      'icon': Icons.battery_alert_outlined, 'bgColor': const Color(0xFFFFEBEE),
+      'examples': ['wg_battery_ex1', 'wg_battery_ex2', 'wg_battery_ex3', 'wg_battery_ex4'],
+      'doList': ['wg_battery_do1', 'wg_battery_do2', 'wg_battery_do3'],
+      'dontList': ['wg_battery_dont1', 'wg_battery_dont2', 'wg_battery_dont3'],
+      'note': 'wg_battery_note',
+    },
+    {
+      'bin': 4, 'nameKey': 'wg_bulb', 'subKey': 'wg_bulb_sub',
+      'icon': Icons.lightbulb_outline, 'bgColor': const Color(0xFFFFEBEE),
+      'examples': ['wg_bulb_ex1', 'wg_bulb_ex2', 'wg_bulb_ex3', 'wg_bulb_ex4'],
+      'doList': ['wg_bulb_do1', 'wg_bulb_do2'],
+      'dontList': ['wg_bulb_dont1', 'wg_bulb_dont2'],
+      'note': 'wg_bulb_note',
+    },
+    {
+      'bin': 4, 'nameKey': 'wg_chemical', 'subKey': 'wg_chemical_sub',
+      'icon': Icons.warning_amber_outlined, 'bgColor': const Color(0xFFFFEBEE),
+      'examples': ['wg_chemical_ex1', 'wg_chemical_ex2', 'wg_chemical_ex3', 'wg_chemical_ex4'],
+      'doList': ['wg_chemical_do1', 'wg_chemical_do2', 'wg_chemical_do3'],
+      'dontList': ['wg_chemical_dont1', 'wg_chemical_dont2', 'wg_chemical_dont3'],
+      'note': 'wg_chemical_note',
     },
   ];
 
@@ -248,34 +111,32 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.locale; // ✅ rebuild เมื่อเปลี่ยนภาษา
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF9E3),
+      backgroundColor: const Color(0xFFE3F5EC),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFE4E1),
+        backgroundColor: const Color(0xFF2D8E6F),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'waste_guide'.tr(),
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          'wg_title'.tr(),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
       body: Column(
         children: [
-          // ── ถังขยะ 4 สี header ────────────────────────────────────────────
           Container(
-            color: Colors.white,
+            color: const Color(0xFFE3F5EC),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '🗑 ถังขยะ 4 สี — ทิ้งให้ถูกถัง',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
+                Text('wg_select_bin'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
                 Row(
                   children: List.generate(4, (i) {
@@ -302,24 +163,16 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                           ),
                           child: Column(
                             children: [
-                              Icon(
-                                bin['icon'] as IconData,
-                                color: _selectedBin == i + 1
-                                    ? Colors.white
-                                    : bin['color'] as Color,
-                                size: 22,
-                              ),
+                              Icon(bin['icon'] as IconData,
+                                  color: _selectedBin == i + 1 ? Colors.white : bin['color'] as Color,
+                                  size: 22),
                               const SizedBox(height: 4),
-                              Text(
-                                bin['label'] as String,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedBin == i + 1
-                                      ? Colors.white
-                                      : bin['color'] as Color,
-                                ),
-                              ),
+                              Text(bin['label'] as String,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedBin == i + 1 ? Colors.white : bin['color'] as Color)),
                             ],
                           ),
                         ),
@@ -341,14 +194,11 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                             color: _bins[_selectedBin]['color'] as Color, size: 16),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            _bins[_selectedBin]['desc'] as String,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _bins[_selectedBin]['color'] as Color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          child: Text(_bins[_selectedBin]['desc'] as String,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: _bins[_selectedBin]['color'] as Color,
+                                  fontWeight: FontWeight.w500)),
                         ),
                       ],
                     ),
@@ -358,8 +208,6 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
             ),
           ),
           const Divider(height: 1),
-
-          // ── รายการขยะ ─────────────────────────────────────────────────────
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -373,19 +221,12 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                   duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: isExpanded
-                        ? item['bgColor'] as Color
-                        : Colors.white,
+                    color: item['bgColor'] as Color,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isExpanded ? binColor.withOpacity(0.3) : Colors.grey.shade200,
-                    ),
+                        color: isExpanded ? binColor.withOpacity(0.3) : Colors.grey.shade200),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
+                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
                     ],
                   ),
                   child: Column(
@@ -394,23 +235,16 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: binColor.withOpacity(0.12),
-                            shape: BoxShape.circle,
-                          ),
+                              color: binColor.withOpacity(0.12), shape: BoxShape.circle),
                           child: Icon(item['icon'] as IconData, color: binColor, size: 24),
                         ),
-                        title: Text(
-                          item['name'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                        subtitle: Text(
-                          item['sub'] as String,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                        title: Text((item['nameKey'] as String).tr(),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        subtitle: Text((item['subKey'] as String).tr(),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         trailing: Icon(
-                          isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                          color: binColor,
-                        ),
+                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            color: binColor),
                         onTap: () => setState(() {
                           _expandedIndex = isExpanded ? -1 : index;
                         }),
@@ -422,12 +256,10 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Divider(),
-                              // ตัวอย่าง
-                              _sectionTitle('📦 ตัวอย่าง', binColor),
+                              _sectionTitle('wg_examples'.tr(), binColor),
                               const SizedBox(height: 6),
                               Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
+                                spacing: 6, runSpacing: 4,
                                 children: (item['examples'] as List).cast<String>().map((e) =>
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -436,14 +268,12 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: binColor.withOpacity(0.3)),
                                     ),
-                                    child: Text(e, style: TextStyle(fontSize: 12, color: binColor)),
+                                    child: Text(e.tr(), style: TextStyle(fontSize: 12, color: binColor)),
                                   ),
                                 ).toList(),
                               ),
                               const SizedBox(height: 12),
-
-                              // วิธีทิ้ง
-                              _sectionTitle('✅ วิธีทิ้งที่ถูกต้อง', const Color(0xFF2E7D32)),
+                              _sectionTitle('wg_do'.tr(), const Color(0xFF2E7D32)),
                               const SizedBox(height: 6),
                               ...(item['doList'] as List).cast<String>().map((d) =>
                                 Padding(
@@ -454,15 +284,13 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                                       const Icon(Icons.check_circle_outline,
                                           color: Color(0xFF2E7D32), size: 16),
                                       const SizedBox(width: 6),
-                                      Expanded(child: Text(d, style: const TextStyle(fontSize: 13))),
+                                      Expanded(child: Text(d.tr(), style: const TextStyle(fontSize: 13))),
                                     ],
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 8),
-
-                              // ข้อห้าม
-                              _sectionTitle('❌ ข้อควรระวัง', const Color(0xFFB71C1C)),
+                              _sectionTitle('wg_dont'.tr(), const Color(0xFFB71C1C)),
                               const SizedBox(height: 6),
                               ...(item['dontList'] as List).cast<String>().map((d) =>
                                 Padding(
@@ -473,30 +301,27 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
                                       const Icon(Icons.cancel_outlined,
                                           color: Color(0xFFB71C1C), size: 16),
                                       const SizedBox(width: 6),
-                                      Expanded(child: Text(d, style: const TextStyle(fontSize: 13))),
+                                      Expanded(child: Text(d.tr(), style: const TextStyle(fontSize: 13))),
                                     ],
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 8),
-
-                              // หมายเหตุ
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: binColor.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                    color: binColor.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10)),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Icon(Icons.info_outline, color: binColor, size: 16),
                                     const SizedBox(width: 6),
                                     Expanded(
-                                      child: Text(
-                                        item['note'] as String,
-                                        style: TextStyle(fontSize: 12, color: binColor, fontStyle: FontStyle.italic),
-                                      ),
+                                      child: Text((item['note'] as String).tr(),
+                                          style: TextStyle(
+                                              fontSize: 12, color: binColor,
+                                              fontStyle: FontStyle.italic)),
                                     ),
                                   ],
                                 ),
@@ -513,61 +338,11 @@ class _WasteGuideScreenState extends State<WasteGuideScreen> {
           ),
         ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFD4B996),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const MyQrCodeScreen()),
-        ),
-        child: const Icon(Icons.qr_code_scanner, color: Colors.white),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navIcon(Icons.home, 'home'.tr(), false,
-                  onTap: () => Navigator.pushAndRemoveUntil(context,
-                      MaterialPageRoute(builder: (_) => const HomeScreen()), (_) => false)),
-              _navIcon(Icons.grid_view_rounded, 'activity'.tr(), false,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ActivityScreen()))),
-              const SizedBox(width: 40),
-              _navIcon(Icons.leaderboard_outlined, 'ranking'.tr(), false,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const RankingScreen()))),
-              _navIcon(Icons.person_outline, 'profile'.tr(), false,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()))),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
   Widget _sectionTitle(String text, Color color) {
-    return Text(
-      text,
-      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
-    );
-  }
-
-  Widget _navIcon(IconData icon, String label, bool isActive, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: isActive ? const Color(0xFFD48EA1) : Colors.grey, size: 26),
-          Text(label, style: TextStyle(
-              fontSize: 10, color: isActive ? const Color(0xFFD48EA1) : Colors.grey)),
-        ],
-      ),
-    );
+    return Text(text,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color));
   }
 }

@@ -2,15 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'ranking_screen.dart';
 import 'profile_screen.dart';
 import 'scan_waste_screen.dart';
-import 'my_qr_code_screen.dart';
+import 'rewards_screen.dart'; // ✅ สำหรับเปิด CouponDetailScreen
+import 'custom_bottom_nav.dart';
 
 class ActivityScreen extends StatelessWidget {
   const ActivityScreen({super.key});
 
-  // ── รวม scan_history + activities แล้ว sort ตาม timestamp ────────────────
+  String _translateBinTypes(String raw) {
+    if (raw.trim().isEmpty) return '';
+    final map = {
+      'ทั่วไป': 'bintype_general',
+      'รีไซเคิล': 'bintype_recycle',
+      'อินทรีย์': 'bintype_organic',
+      'อันตราย': 'bintype_hazardous',
+    };
+    final parts = raw.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty);
+    return parts.map((p) => map.containsKey(p) ? map[p]!.tr() : p).join(', ');
+  }
+
+  // ✅ แปลง label ขยะให้เปลี่ยนตามภาษาปัจจุบัน (TH / EN)
+  String _translateLabel(BuildContext context, String rawLabel) {
+    if (rawLabel.isEmpty || rawLabel == '-') return '-';
+    
+    final key = rawLabel.trim().toLowerCase();
+    final isThai = context.locale.languageCode == 'th';
+
+    // Map ภาษาแยกตามความเหมาะสม
+    final translations = {
+      'plastic': isThai ? 'พลาสติก' : 'Plastic',
+      'glass': isThai ? 'แก้ว' : 'Glass',
+      'paper': isThai ? 'กระดาษ' : 'Paper',
+      'metal': isThai ? 'โลหะ/กระป๋อง' : 'Metal',
+      'organic': isThai ? 'ขยะอินทรีย์' : 'Organic',
+      'general': isThai ? 'ขยะทั่วไป' : 'General',
+      'hazardous': isThai ? 'ขยะอันตราย' : 'Hazardous',
+      'can': isThai ? 'กระป๋อง' : 'Can',
+      'bottle': isThai ? 'ขวด' : 'Bottle',
+    };
+
+    if (translations.containsKey(key)) {
+      return translations[key]!;
+    }
+
+    return key.tr();
+  }
+
+  // ✅ รวม scan_history + activities + redemptions
   Stream<List<Map<String, dynamic>>> _mergedStream(String uid) {
     final scanStream = FirebaseFirestore.instance
         .collection('users')
@@ -19,14 +60,8 @@ class ActivityScreen extends StatelessWidget {
         .snapshots()
         .map((s) => s.docs.map((d) => {...d.data(), '_source': 'scan'}).toList());
 
-    final actStream = FirebaseFirestore.instance
-        .collection('activities')
-        .where('userId', isEqualTo: uid)
-        .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), '_source': 'activity'}).toList());
-
     return scanStream.asyncMap((scanList) async {
-      // ดึง activities แบบ one-shot แล้วรวม
+      // activities
       final actSnap = await FirebaseFirestore.instance
           .collection('activities')
           .where('userId', isEqualTo: uid)
@@ -35,10 +70,19 @@ class ActivityScreen extends StatelessWidget {
           .map((d) => {...d.data(), '_source': 'activity'})
           .toList();
 
-      final all = [...scanList, ...actList];
+      // ✅ redemptions (ประวัติแลกรางวัล)
+      final redSnap = await FirebaseFirestore.instance
+          .collection('redemptions')
+          .where('userId', isEqualTo: uid)
+          .get();
+      final redList = redSnap.docs
+          .map((d) => {...d.data(), '_id': d.id, '_source': 'redemption'})
+          .toList();
+
+      final all = [...scanList, ...actList, ...redList];
       all.sort((a, b) {
-        final ta = (a['timestamp'] as Timestamp?);
-        final tb = (b['timestamp'] as Timestamp?);
+        final ta = (a['timestamp'] as Timestamp?) ?? (a['createdAt'] as Timestamp?);
+        final tb = (b['timestamp'] as Timestamp?) ?? (b['createdAt'] as Timestamp?);
         if (ta == null && tb == null) return 0;
         if (ta == null) return 1;
         if (tb == null) return -1;
@@ -50,6 +94,7 @@ class ActivityScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.locale;
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
@@ -72,13 +117,13 @@ class ActivityScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: user == null
-          ? const Center(child: Text('กรุณาเข้าสู่ระบบ'))
+          ? Center(child: Text('activity_login_required'.tr()))
           : StreamBuilder<List<Map<String, dynamic>>>(
               stream: _mergedStream(user.uid),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text('เกิดข้อผิดพลาด:\n${snapshot.error}',
+                    child: Text('${snapshot.error}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.red)),
                   );
@@ -88,56 +133,104 @@ class ActivityScreen extends StatelessWidget {
                 }
                 final docs = snapshot.data ?? [];
                 if (docs.isEmpty) {
-                  return const Center(child: Text('ยังไม่มีประวัติกิจกรรม'));
+                  return Center(child: Text('activity_no_history'.tr()));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
                   itemCount: docs.length,
-                  itemBuilder: (context, index) => _buildCard(docs[index]),
+                  itemBuilder: (context, index) => _buildCard(context, docs[index]),
                 );
               },
             ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFD4B996),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const MyQrCodeScreen()),
-        ),
-        child: const Icon(Icons.qr_code_scanner, color: Colors.white),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavIcon(context, Icons.home, 'หน้าหลัก', false,
-                  onTap: () => Navigator.pop(context)),
-              _buildNavIcon(context, Icons.grid_view_rounded, 'กิจกรรม', true,
-                  onTap: () {}),
-              const SizedBox(width: 40),
-              _buildNavIcon(context, Icons.leaderboard_outlined, 'จัดอันดับ', false,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const RankingScreen()))),
-              _buildNavIcon(context, Icons.person_outline, 'โปรไฟล์', false,
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()))),
-            ],
-          ),
-        ),
-      ),
+      bottomNavigationBar: buildCustomBottomNav(context, 'activity'),
     );
   }
 
-  Widget _buildCard(Map<String, dynamic> data) {
+  Widget _buildCard(BuildContext context, Map<String, dynamic> data) {
     final source = data['_source'] as String? ?? 'scan';
 
-    // ── กรณีเพิ่มจุดถัง ──────────────────────────────────────────────────────
+    // ✅ การ์ดประวัติแลกรางวัล
+    if (source == 'redemption') {
+      final rewardName = data['rewardName'] as String? ?? '-';
+      final pointsCost = (data['pointsCost'] as num?)?.toInt() ?? 0;
+      final code = data['code'] as String? ?? '';
+      final used = data['used'] == true;
+      final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+      final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
+      final dateStr = createdAt != null
+          ? '${createdAt.day}/${createdAt.month}/${createdAt.year}  '
+            '${createdAt.hour.toString().padLeft(2, '0')}:'
+            '${createdAt.minute.toString().padLeft(2, '0')}'
+          : '-';
+      final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+
+      return GestureDetector(
+        onTap: expiresAt != null
+            ? () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => CouponDetailScreen(
+                      rewardName: rewardName, code: code, expiry: expiresAt,
+                      initialUsed: used),
+                ))
+            : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFF4CAF50).withOpacity(0.12),
+                child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFF4CAF50)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('activity_redeem_reward'.tr(),
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text(rewardName, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                    Text(code, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(dateStr, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('-$pointsCost ${'points'.tr()}',
+                      style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: used ? Colors.grey.shade300 : isExpired ? Colors.red.shade100 : const Color(0xFF4CAF50).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      used ? 'coupon_used'.tr() : isExpired ? 'coupon_expired'.tr() : 'coupon_redeemed'.tr(),
+                      style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w600,
+                          color: used ? Colors.grey.shade700 : isExpired ? Colors.red.shade700 : const Color(0xFF4CAF50)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // การ์ดเพิ่มถังขยะ
     if (source == 'activity' && data['type'] == 'add_bin') {
-      final name = data['detail'] as String? ?? 'ถังขยะ';
+      final name = data['detail'] as String? ?? '-';
       final points = data['points'] as int? ?? 2;
       final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
       final dateStr = timestamp != null
@@ -145,7 +238,8 @@ class ActivityScreen extends StatelessWidget {
             '${timestamp.hour.toString().padLeft(2, '0')}:'
             '${timestamp.minute.toString().padLeft(2, '0')}'
           : '-';
-      final types = (data['binTypes'] as List?)?.join(', ') ?? '';
+      final rawTypes = (data['binTypes'] as List?)?.join(', ') ?? '';
+      final types = _translateBinTypes(rawTypes);
 
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -154,56 +248,42 @@ class ActivityScreen extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
           children: [
             CircleAvatar(
               backgroundColor: const Color(0xFF4CAF50).withOpacity(0.12),
-              child: const Icon(Icons.add_location_alt_outlined,
-                  color: Color(0xFF4CAF50)),
+              child: const Icon(Icons.add_location_alt_outlined, color: Color(0xFF4CAF50)),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('เพิ่มจุดถังขยะ',
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold)),
-                  Text(name,
-                      style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                  Text('activity_add_bin'.tr(),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(name, style: const TextStyle(fontSize: 13, color: Colors.black87)),
                   if (types.isNotEmpty)
-                    Text(types,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text(dateStr,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(types, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(dateStr, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
             Text(
-              '+$points แต้ม',
-              style: const TextStyle(
-                color: Color(0xFF66BB6A),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
+              '+$points ${'points'.tr()}',
+              style: const TextStyle(color: Color(0xFF66BB6A), fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ],
         ),
       );
     }
 
-    // ── กรณีสแกนขยะ (scan_history เดิม) ─────────────────────────────────────
-    final label = data['label'] as String? ?? 'ไม่ทราบ';
-    final points = data['pointsEarned'] as int?
-        ?? data['points'] as int?
-        ?? 0;
+    // ✅ การ์ดสแกนขยะ
+    final rawLabel = data['label'] as String? ?? '-';
+    final label = _translateLabel(context, rawLabel); // 👈 ส่ง context เข้าไปสลับภาษาอัตโนมัติ
+    final points = data['pointsEarned'] as int? ?? data['points'] as int? ?? 0;
     final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
     final dateStr = timestamp != null
         ? '${timestamp.day}/${timestamp.month}/${timestamp.year}  '
@@ -216,6 +296,31 @@ class ActivityScreen extends StatelessWidget {
     final catColor = _categoryColor(categoryId);
     final catIcon = _categoryIcon(categoryId);
 
+    String distText;
+    Color distBg, distBorder, distTextColor, distIconColor;
+
+    if (distanceMeters < 0) {
+      distText = 'activity_no_location'.tr();
+      distBg = Colors.grey.shade100;
+      distBorder = Colors.grey;
+      distTextColor = Colors.grey;
+      distIconColor = Colors.grey;
+    } else if (withinRadius) {
+      distText = 'activity_within_radius'.tr(
+          namedArgs: {'dist': distanceMeters.toStringAsFixed(1)});
+      distBg = const Color(0xFFE8F5E9);
+      distBorder = const Color(0xFF2E7D32);
+      distTextColor = const Color(0xFF388E3C);
+      distIconColor = const Color(0xFF2E7D32);
+    } else {
+      distText = 'activity_out_of_radius'.tr(
+          namedArgs: {'dist': distanceMeters.toStringAsFixed(1)});
+      distBg = const Color(0xFFFFEBEE);
+      distBorder = const Color(0xFFF44336);
+      distTextColor = const Color(0xFFB71C1C);
+      distIconColor = const Color(0xFFF44336);
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -223,11 +328,7 @@ class ActivityScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -244,16 +345,15 @@ class ActivityScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.bold)),
-                    Text(dateStr,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    Text(dateStr, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
               ),
               Text(
-                points > 0 ? '+$points แต้ม' : 'ไม่ได้แต้ม',
+                points > 0
+                    ? '+$points ${'points'.tr()}'
+                    : 'activity_no_points'.tr(),
                 style: TextStyle(
                   color: points > 0 ? const Color(0xFF66BB6A) : Colors.grey,
                   fontWeight: FontWeight.bold,
@@ -266,47 +366,17 @@ class ActivityScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: distanceMeters < 0
-                  ? Colors.grey.shade100
-                  : withinRadius
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFEBEE),
+              color: distBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: distanceMeters < 0
-                    ? Colors.grey.shade300
-                    : withinRadius
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFF44336),
-              ),
+              border: Border.all(color: distBorder),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.location_on,
-                    size: 13,
-                    color: distanceMeters < 0
-                        ? Colors.grey
-                        : withinRadius
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFF44336)),
+                Icon(Icons.location_on, size: 13, color: distIconColor),
                 const SizedBox(width: 4),
-                Text(
-                  distanceMeters < 0
-                      ? 'ไม่สามารถระบุตำแหน่งได้'
-                      : withinRadius
-                          ? 'อยู่ในรัศมี ${distanceMeters.toStringAsFixed(1)} ม. จากถัง ✓'
-                          : 'ห่างถัง ${distanceMeters.toStringAsFixed(1)} ม.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: distanceMeters < 0
-                        ? Colors.grey
-                        : withinRadius
-                            ? const Color(0xFF388E3C)
-                            : const Color(0xFFB71C1C),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(distText,
+                    style: TextStyle(fontSize: 11, color: distTextColor, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -331,24 +401,5 @@ class ActivityScreen extends StatelessWidget {
       case 'hazardous':  return Icons.warning_amber_rounded;
       default:           return Icons.delete_outline;
     }
-  }
-
-  Widget _buildNavIcon(BuildContext context, IconData icon, String label,
-      bool isActive, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              color: isActive ? const Color(0xFFD48EA1) : Colors.grey,
-              size: 26),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: isActive ? const Color(0xFFD48EA1) : Colors.grey)),
-        ],
-      ),
-    );
   }
 }

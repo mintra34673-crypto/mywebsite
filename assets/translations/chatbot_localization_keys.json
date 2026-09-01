@@ -1,0 +1,47 @@
+{
+  "thai": {
+    "chatbot.assistantName": "EcoBot",
+    "chatbot.assistantSubtitle": "ผู้ช่วยด้านสิ่งแวดล้อม",
+    "chatbot.greeting": "สวัสดีค่ะ 👋 ฉันคือ EcoBot ผู้ช่วยของคุณในการคัดแยกขยะและดูแลสิ่งแวดล้อม\nมีอะไรที่เราสามารถช่วยคุณได้บ้างคะ?",
+    "chatbot.clearHistoryTitle": "ล้างประวัติแชท",
+    "chatbot.clearHistoryContent": "คุณแน่ใจว่าต้องการล้างประวัติการแชททั้งหมดหรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้",
+    "chatbot.cancel": "ยกเลิก",
+    "chatbot.delete": "ลบ",
+    "chatbot.autoSpeakTooltip": "สลับเสียงตอบสนอง",
+    "chatbot.clearHistoryTooltip": "ล้างประวัติแชท",
+    "chatbot.errorMessage": "ขออภัยค่ะ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+    "chatbot.micError": "ไมโครโฟนไม่พร้อมใช้งาน",
+    "chatbot.isListeningHint": "กำลังรับฟังอยู่...",
+    "chatbot.placeholderHint": "พิมพ์คำถามหรือแนะนำให้ EcoBot...",
+    "chatbot.quickReplies": "ขยะพลาสติกทิ้งที่ไหน?\nตัดแยกขยะอย่างไรให้ถูกต้อง?\nถังขยะสีไหนใช้ทำไม?\nจะเก็บแบตเตอรี่ได้ไหม?"
+  },
+  "english": {
+    "chatbot.assistantName": "EcoBot",
+    "chatbot.assistantSubtitle": "Environmental Assistant",
+    "chatbot.greeting": "Hello 👋 I'm EcoBot, your assistant for waste sorting and environmental care.\nHow can I help you today?",
+    "chatbot.clearHistoryTitle": "Clear Chat History",
+    "chatbot.clearHistoryContent": "Are you sure you want to clear all chat history? This action cannot be undone.",
+    "chatbot.cancel": "Cancel",
+    "chatbot.delete": "Delete",
+    "chatbot.autoSpeakTooltip": "Toggle auto-speak response",
+    "chatbot.clearHistoryTooltip": "Clear chat history",
+    "chatbot.errorMessage": "Sorry, an error occurred. Please try again.",
+    "chatbot.micError": "Microphone is not available",
+    "chatbot.isListeningHint": "Listening...",
+    "chatbot.placeholderHint": "Ask EcoBot or get suggestions...",
+    "chatbot.quickReplies": "Where to dispose plastic waste?\nHow to sort waste correctly?\nWhat are the 4-color bins?\nCan I recycle batteries?"
+  },
+  "notes": {
+    "system_instruction_th": "ตั้งอยู่ในไฟล์ Dart chatbot_screen.dart",
+    "system_instruction_en": "ตั้งอยู่ในไฟล์ Dart chatbot_screen.dart",
+    "groq_api": "ใช้ Groq API (llama-3.3-70b-versatile)",
+    "features": [
+      "Speech-to-Text (STT) - รับฟังคำพูด",
+      "Text-to-Speech (TTS) - อ่านคำตอบออกเสียง",
+      "Firebase Firestore - บันทึกประวัติแชท",
+      "Easy Localization - รองรับภาษาไทยและอังกฤษ",
+      "Quick Replies - ปุ่มคำถามแนะนำ",
+      "Auto-speak Toggle - เปิด/ปิดเสียงอัตโนมัติ"
+    ]
+  }
+}
